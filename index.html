@@ -31,9 +31,7 @@
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%234a0208'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='36' text-anchor='middle' fill='%23e8bd5a'%3E%26amp;%3C/text%3E%3C/svg%3E">
 <link rel="preload" as="image" href="invitation.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+<link rel="preload" as="font" type="font/woff2" href="digits.woff2" crossorigin>
 
 <script type="application/ld+json">
 {
@@ -52,65 +50,87 @@
 }
 </script>
 
+
 <style>
-  :root { --bg: #2a0104; color-scheme: only dark; }
+  :root { color-scheme: only dark; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    background: var(--bg) radial-gradient(ellipse at center, #4a0208 0%, #2a0104 70%);
-    display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; min-height: 100dvh; overflow-x: hidden;
-  }
-  .card {
-    position: relative;
-    width: min(100vw, calc(100dvh * 1086 / 1448), 1086px);
-    aspect-ratio: 1086 / 1448;
-    container-type: inline-size;
-    box-shadow: 0 0 60px rgba(0,0,0,.6);
-  }
-  @supports not (height: 100dvh) {
-    .card { width: min(100vw, calc(100vh * 1086 / 1448), 1086px); }
-  }
-  .card > img.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none; }
-  .num {
-    position: absolute;
-    top: 55.25%; height: 4.2%;
-    width: 12%;
-    transform: translateX(-50%);
-    display: flex; align-items: center; justify-content: center;
-    font-family: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-    font-weight: 700;
-    font-variant-numeric: lining-nums tabular-nums;
-    font-size: 6.4cqw;
-    line-height: 1;
-    background: linear-gradient(180deg, #fff1bd 0%, #f6d27c 40%, #d9a03e 75%, #f1c96b 100%);
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent;
-    filter: drop-shadow(0 0.15cqw 0.25cqw rgba(0,0,0,.55));
-  }
-  .d { left: 24.40%; } .h { left: 41.67%; } .m { left: 58.70%; } .s { left: 75.74%; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #2a0104; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: manipulation; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
-  <main class="card" role="img" aria-label="Wedding invitation: Shahiduzzaman Fahad and Tasfiya Nazneen Sanam, 20th November 2026, Zinnurain Convention Center, Level 3, East Nasirabad, 2no Gate, Chattogram">
-    <img class="bg" src="invitation.jpg" width="1086" height="1448" alt="" fetchpriority="high" decoding="async">
-    <div class="num d" id="d" aria-label="days">00</div>
-    <div class="num h" id="h" aria-label="hours">00</div>
-    <div class="num m" id="m" aria-label="minutes">00</div>
-    <div class="num s" id="s" aria-label="seconds">00</div>
-  </main>
+  <canvas id="c" role="img" aria-label="Wedding invitation: Shahiduzzaman Fahad and Tasfiya Nazneen Sanam, 20th November 2026, Zinnurain Convention Center, Level 3, East Nasirabad, 2no Gate, Chattogram"></canvas>
+  <p class="sr" id="live" aria-live="off"></p>
+  <noscript><img src="invitation.jpg" alt="Wedding invitation" style="display:block;max-width:100%;height:auto;margin:auto"></noscript>
 <script>
   (function () {
-    var target = Date.parse("2026-11-20T21:00:00+06:00");
-    var els = ["d", "h", "m", "s"].map(function (id) { return document.getElementById(id); });
+    // Everything is drawn as canvas pixels, so browser dark modes and themes cannot recolor it.
+    var W = 1086, H = 1448;
+    var TARGET = Date.parse("2026-11-20T21:00:00+06:00");
+    var CENTERS = [265, 452.5, 637.5, 822.5];
+    var DIGIT_TOP = 807, DIGIT_BOTTOM = 852;
+    var FONT = '70px InviteDigits, Georgia, serif';
+    var canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+    var img = new Image(), imgReady = false, layout = null;
+
     function pad(n) { return n < 10 ? "0" + n : String(n); }
-    function tick() {
-      var left = Math.max(0, Math.floor((target - Date.now()) / 1000));
-      var v = [Math.floor(left / 86400), Math.floor(left % 86400 / 3600), Math.floor(left % 3600 / 60), left % 60];
-      for (var i = 0; i < 4; i++) { var t = pad(v[i]); if (els[i].textContent !== t) els[i].textContent = t; }
-      if (left > 0) setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+
+    function resize() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 3);
+      var vw = window.innerWidth, vh = window.innerHeight;
+      canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
+      var scale = Math.min(vw / W, vh / H, 1);
+      layout = { dpr: dpr, vw: vw, vh: vh, s: scale, x: (vw - W * scale) / 2, y: (vh - H * scale) / 2 };
+      draw();
     }
-    tick();
+
+    function draw() {
+      if (!layout) return;
+      var L = layout;
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      var bg = ctx.createRadialGradient(L.vw / 2, L.vh / 2, 0, L.vw / 2, L.vh / 2, Math.max(L.vw, L.vh) * 0.7);
+      bg.addColorStop(0, "#4a0208"); bg.addColorStop(1, "#2a0104");
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, L.vw, L.vh);
+      if (!imgReady) return;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 60 * L.dpr;
+      ctx.drawImage(img, L.x, L.y, W * L.s, H * L.s);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(L.x, L.y); ctx.scale(L.s, L.s);
+      var left = Math.max(0, Math.floor((TARGET - Date.now()) / 1000));
+      var v = [Math.floor(left / 86400), Math.floor(left % 86400 / 3600), Math.floor(left % 3600 / 60), left % 60];
+      ctx.font = FONT; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      var grad = ctx.createLinearGradient(0, DIGIT_TOP, 0, DIGIT_BOTTOM);
+      grad.addColorStop(0, "#fff1bd"); grad.addColorStop(0.4, "#f6d27c"); grad.addColorStop(0.75, "#d9a03e"); grad.addColorStop(1, "#f1c96b");
+      for (var i = 0; i < 4; i++) {
+        var t = pad(v[i]);
+        ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowOffsetY = 1.6 * L.s * L.dpr; ctx.shadowBlur = 2.7 * L.s * L.dpr;
+        ctx.fillStyle = grad;
+        ctx.fillText(t, CENTERS[i], DIGIT_BOTTOM);
+      }
+      ctx.restore();
+      document.getElementById("live").textContent = v[0] + " days " + v[1] + " hours " + v[2] + " minutes " + v[3] + " seconds left";
+    }
+
+    function tick() {
+      draw();
+      if (Date.now() < TARGET) setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
+    img.onload = function () { imgReady = true; draw(); };
+    img.src = "invitation.jpg";
+    resize();
+    var fontReady = Promise.resolve();
+    if (window.FontFace && document.fonts) {
+      fontReady = new FontFace("InviteDigits", "url(digits.woff2)").load()
+        .then(function (f) { document.fonts.add(f); }, function () {});
+    }
+    Promise.race([fontReady, new Promise(function (r) { setTimeout(r, 3000); })]).then(function () { draw(); tick(); });
   })();
 </script>
 </body>
