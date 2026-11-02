@@ -123,7 +123,7 @@
     window.addEventListener("resize", resize);
     window.addEventListener("orientationchange", resize);
     img.onload = function () { imgReady = true; draw(); };
-    img.src = "invitation.jpg";
+    img.src = "invitation.jpg?v=10";
     resize();
     var fontReady = Promise.resolve();
     if (window.FontFace && document.fonts) {
